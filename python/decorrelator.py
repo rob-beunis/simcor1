@@ -8,8 +8,7 @@ The program 'visualizes' the decorrelation procedure of the electrosensory
 lateral line lobe (ELL) of mormyrid fish and its implementation variants, as
 described in Beunis R. (2022) "The electrosensory lateral line lobe (ELL) in
 mormyrid fish : a stepping stone to the understanding of the cerebellum ?"
-Part 1 (the ELL), Zenodo, doi:10.5281/zenodo.17602438, and Part 2 (the
-cerebellum).
+Part 1 (the ELL), Zenodo, doi:10.5281/zenodo.17602438.
 
 A signal S3 (the sum of an unchanging signal S1 and a signal S2 that is
 different at every iteration) is fed 250 times to a decorrelation procedure.
@@ -29,12 +28,14 @@ Deliberate differences from VFP:
   * RAND() -> a Park-Miller generator.  Reproducing the exact random sequence
     of a VFP run is impossible; with --seed a run is reproducible.
   * The speed of an iteration and of a screen drawing is taken from VFP 9;
-    a playback speed control and a demo panel were added.
+    after the first drawing (slow motion) a demo runs twice as fast.  A demo
+    starts at once (VFP first waits for a key).  A playback speed control,
+    Interrupt/Stop buttons and a demo panel were added.
   * The parameter table MEM.DBF is not kept between sessions: every demo
     starts from the demo values.
-  * Only the modes used in the articles are translated: basic simulation
-    (MODE 1), ELL simulation (MODE 2) and PuC simulation (MODE 6).  The eye
-    blink (EBR) modes 3..5 belong to other articles.
+  * Only the modes used in the article are translated: basic simulation
+    (MODE 1) and ELL simulation (MODE 2) (and MODE 6).  The eye blink (EBR)
+    modes 3..5 belong to other articles.
 
 Usage:
   python decorrelator.py               demo 5
@@ -1266,22 +1267,19 @@ SECTIONS = [
         (40, "Figs. 19b, 20a, p. 38", "S2 flat, lift of 41"), (41, "Fig. 20b, p. 38", "S2 flat, lift of 40"),
         (42, "Fig. 21a, p. 39", "Lift of 62"), (43, "Fig. 21b, p. 39", "Lift of 66"), (44, "Fig. 21c, p. 39", "Lift of 70"),
         (45, "Fig. 22a, p. 39", "S2 flat, lift of 43"), (46, "Fig. 22b, p. 39", "S2 flat, lift of 47"),
-        (47, "Fig. 22c, p. 39", "S2 flat, lift of 43, without BSa-D")]),
-    ("Part 2 - PuC simulation (iBCM rule)", [
-        (80, "Part 2, Fig. 7, p. 34", "PuC simulation with the iBCM rule: Ca-threshold 42"),
-        (81, "Part 2, Fig. 8a, p. 34", "S2 flat (no UC), Ca-threshold 21"),
-        (82, "Part 2, Fig. 8b, p. 34", "S2 flat, Ca-threshold 11: the apexes of S3 transgress the Ca-threshold"),
-        (83, "Part 2, Fig. 8c, p. 34", "S2 flat, Ca-threshold 31: a 'lift' of S4")])]
+        (47, "Fig. 22c, p. 39", "S2 flat, lift of 43, without BSa-D")])]
 DEMOINFO = {n: (sec, fig, txt) for sec, lst in SECTIONS for n, fig, txt in lst}
 SPEEDS = (0.25, 0.5, 1, 2, 4, 8, 16)
 # Timing, measured in VFP 9 per mode: computing one iteration (250 timeslices), and drawing the screen
 # (DRAWALLLINES), which moves the 13 line objects of every timeslice one after the other, so that the new
 # state appears from left to right; the first drawing of a run takes longer. The slow start of demo 26
 # (SLOW) is a counting loop of SLOW*1000000/ic^2 steps (about 15000 steps per ms).
+# After the first drawing (slow motion), a demo runs twice as fast as in VFP (AFTER_FIRST).
 CYCLE_MS = {1: 10, 2: 16, 6: 32}
 DRAW_MS = {1: 960, 2: 1060, 6: 1080}
 FIRST_DRAW_MS = {1: 6100, 2: 5900, 6: 6500}
 SLOW_STEPS_PER_MS = 15000
+AFTER_FIRST = 2
 FORM_W = 632
 
 
@@ -1381,7 +1379,7 @@ class App:
         self.demo = demo
         self.state = "idle"
         self.run_id = 0
-        root.title("DECORRELATOR - Beunis 2022 (ELL Part 1 and Part 2)")
+        root.title("DECORRELATOR - Beunis 2022 (ELL Part 1)")
         root.configure(bg="#808080")
         self.cv = tk.Label(root, bd=0, bg="#808080")
         self.cv.grid(row=0, column=0, sticky="nw")
@@ -1390,13 +1388,20 @@ class App:
         self.build_panel()
         self.cv.bind("<Button-1>", self.on_click)
         self.cv.bind("<Button-3>", self.on_right)
-        root.bind("<Key>", self.on_key)
         self.select(demo)
 
     def build_panel(self):
         tk = self.tk
         tk.Label(self.panel, text="DECORRELATOR", bg="#d4d0c8", font=("Arial", 11, "bold")).pack()
-        tk.Label(self.panel, text="ELL articles, Beunis 2022 - live demos", bg="#d4d0c8", font=("Arial", 8)).pack()
+        tk.Label(self.panel, text="ELL article Part 1, Beunis 2022 - live demos", bg="#d4d0c8", font=("Arial", 8)).pack()
+        row = tk.Frame(self.panel, bg="#d4d0c8")
+        row.pack(pady=(3, 3))
+        self.bint = tk.Button(row, text="", width=12, font=("Arial", 10, "bold"), bg="#ffd24d", bd=2,
+                              command=self.pause)
+        self.bint.pack(side="left", padx=3)
+        self.bstop = tk.Button(row, text="\u25a0  Stop", width=8, font=("Arial", 10, "bold"), bg="#ff6b5b", fg="#ffffff",
+                               bd=2, command=self.stop)
+        self.bstop.pack(side="left", padx=3)
         self.buttons = {}
         for sec, lst in SECTIONS:
             tk.Label(self.panel, text=sec, bg="#d4d0c8", font=("Arial", 7, "bold"), anchor="w").pack(fill="x", pady=(3, 0))
@@ -1434,8 +1439,16 @@ class App:
         for sp, b in self.sbuttons.items():
             b.configure(bg="#ffff00" if sp == self.speed else "#e1e1e1")
         sec, fig, txt = DEMOINFO.get(self.demo, ("", "", ""))
-        self.info.configure(text="Demo %d - %s\n%s\n\nClick or press a key to start. Click the text box at "
-                                 "the bottom left to interrupt, right-click it to stop." % (self.demo, fig, txt))
+        self.info.configure(text="Demo %d - %s\n%s" % (self.demo, fig, txt))
+        self.mark_run()
+
+    def mark_run(self):
+        """The Interrupt / Resume and Stop buttons (as clicking and right-clicking the text box at the bottom left)."""
+        running = self.state in ("run", "wait")
+        paused = bool(self.D and self.D.plPause)
+        self.bint.configure(text="\u25b6  Resume" if paused else "\u275a\u275a  Interrupt",
+                            bg="#7ee07e" if paused else "#ffd24d", state="normal" if running else "disabled")
+        self.bstop.configure(state="normal" if running else "disabled")
 
     def select(self, n):
         self.run_id += 1
@@ -1447,18 +1460,13 @@ class App:
         self.shown = clone_lines(self.D.L)
         self.draws = 0
         self.mark()
-        self.show(wait=True)
+        self.show()
+        rid = self.run_id
+        self.root.after(400, lambda: self.go() if rid == self.run_id and self.state == "wait" else None)   # starts at once
 
-    def show(self, wait=False):
-        from PIL import Image, ImageDraw, ImageTk
+    def show(self):
+        from PIL import Image, ImageTk
         img = self.form.paint(self.D, self.shown)
-        if wait:
-            dr = ImageDraw.Draw(img)
-            msg = "Press any key to continue..."
-            w = dr.textlength(msg, font=self.form.f_fit)
-            x0 = FORM_W - w - 22
-            dr.rectangle((x0, 6, FORM_W - 6, 26), fill=(255, 255, 225), outline=(0, 0, 0))
-            dr.text((x0 + 8, 21), msg, fill=(0, 0, 0), font=self.form.f_fit, anchor="ls")
         if self.scale != 1:
             img = img.resize((round(img.width * self.scale), round(img.height * self.scale)), Image.LANCZOS)
         self.tkimg = ImageTk.PhotoImage(img)
@@ -1470,26 +1478,32 @@ class App:
         return p.left <= x < p.left + p.width and p.top <= y < p.top + p.height
 
     def on_click(self, e):
-        if self.state == "wait":
-            self.go()
-        elif self.state == "run" and self.in_lbp(e):
-            D = self.D
-            D.plPause = not D.plPause
-            c = D.obj["LBP"].caption
-            D.obj["LBP"].caption = c.replace("interrupt", "resume") if D.plPause else c.replace("resume", "interrupt")
-            self.show()
+        if self.in_lbp(e):
+            self.pause()
 
     def on_right(self, e):
-        if self.state == "run" and self.in_lbp(e):
+        if self.in_lbp(e):
+            self.stop()
+
+    def pause(self):
+        if self.state != "run":
+            return
+        D = self.D
+        D.plPause = not D.plPause
+        c = D.obj["LBP"].caption
+        D.obj["LBP"].caption = c.replace("interrupt", "resume") if D.plPause else c.replace("resume", "interrupt")
+        self.show()
+        self.mark_run()
+
+    def stop(self):
+        if self.state == "run":
             self.D.plBreak = True
             self.D.plPause = False
-
-    def on_key(self, e):
-        if self.state == "wait" and e.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R"):
-            self.go()
+            self.mark_run()
 
     def go(self):
         self.state = "run"
+        self.mark_run()
         self.show()
         self.gen = self.D.EXECUTE()
         self.due = time.perf_counter()
@@ -1510,20 +1524,20 @@ class App:
                 self.shown = clone_lines(self.D.L)
                 self.show()
                 self.state = "done"
+                self.mark_run()
                 return
-            self.due += self.cyc / self.speed
+            f = AFTER_FIRST if self.draws > 0 else 1
+            self.due += self.cyc / self.speed / f
             if r["drawn"]:
                 D, mode = self.D, self.D.MEM["MODE"]
                 if not r.get("end") and D.MEM["SLOW"] > 0 and D.pnIC >= 2:
-                    self.due += D.MEM["SLOW"] * 1e6 / (D.pnIC * D.pnIC) / SLOW_STEPS_PER_MS / 1000 / self.speed
-                ms = (FIRST_DRAW_MS if self.draws == 0 else DRAW_MS).get(mode, 960)
+                    self.due += D.MEM["SLOW"] * 1e6 / (D.pnIC * D.pnIC) / SLOW_STEPS_PER_MS / 1000 / self.speed / f
+                ms = FIRST_DRAW_MS.get(mode, 6000) if self.draws == 0 else DRAW_MS.get(mode, 960) / AFTER_FIRST
                 self.draws += 1
                 self.sweep_target, self.sweep_done = clone_lines(D.L), 0
                 self.sweep_ms, self.sweep_t0 = ms, max(self.due, time.perf_counter())
                 self.root.after(max(1, int((self.sweep_t0 - time.perf_counter()) * 1000)), self.sweep, rid)
                 return
-            if self.due > time.perf_counter() + 0.004 or time.perf_counter() > t_end:
-                break
             if self.due > time.perf_counter() + 0.004 or time.perf_counter() > t_end:
                 break
         now = time.perf_counter()
@@ -1565,12 +1579,12 @@ def clone_lines(L):
 
 def main():
     ap = argparse.ArgumentParser(description="DECORRELATOR - Python version of the DECORRELATOR form (CEREBREADER.PRG)")
-    ap.add_argument("--demo", type=int, default=5, help="demo number of the original program (5..49, 80..83)")
+    ap.add_argument("--demo", type=int, default=5, help="demo number of the original program (5..49)")
     ap.add_argument("--speed", type=float, default=1.0, help="playback speed (0.25..16; 1 = speed of the VFP original)")
     ap.add_argument("--seed", type=int, default=None, help="fixed seed for a reproducible run")
     ap.add_argument("--scale", type=float, default=1.0, help="zoom factor of the form (e.g. 1.5)")
     a = ap.parse_args()
-    if a.demo not in DEMOS:
+    if a.demo not in DEMOINFO:
         sys.exit("unknown demo %d" % a.demo)
     import tkinter as tk
     root = tk.Tk()

@@ -9,9 +9,8 @@
 * Usage:  DO decorrelator              interactive mode (dashboard)
 *         DO decorrelator WITH "27"    demo 27 (video "demo-1-27" of the article)
 *
-* Articles: Beunis R. (2022) The electrosensory lateral line lobe (ELL) in mormyrid fish : a stepping stone
-*           to the understanding of the cerebellum ? Part 1 (the ELL), Zenodo, doi:10.5281/zenodo.17602438,
-*           and Part 2 (the cerebellum).
+* Article: Beunis R. (2022) The electrosensory lateral line lobe (ELL) in mormyrid fish : a stepping stone
+*          to the understanding of the cerebellum ? Part 1 (the ELL), Zenodo, doi:10.5281/zenodo.17602438.
 
 PARAMETERS cDemo
 
