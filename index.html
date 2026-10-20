@@ -27,7 +27,6 @@
   #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; touch-action: manipulation;
            font-family: Arial, Helvetica, "Liberation Sans", sans-serif; }
   #cv { position: absolute; left: 0; top: 0; cursor: default; }
-  #lbp { position: absolute; cursor: pointer; }
   #panel { position: absolute; top: 0; background: #d4d0c8; box-sizing: border-box; padding: 5px 6px; overflow: hidden;
            font: 11px Arial, Helvetica, sans-serif; color: #000; }
   #panel .ttl { font-weight: bold; font-size: 13px; text-align: center; }
@@ -57,7 +56,6 @@
 <body>
 <div id="stage">
   <canvas id="cv"></canvas>
-  <div id="lbp" title="Click to interrupt (and click again to resume) / right-click to stop"></div>
   <div id="panel"></div>
 </div>
 <script>
@@ -1258,13 +1256,15 @@ const SPEEDS = [0.25, 0.5, 1, 2, 4, 8, 16];
 // (DRAWALLLINES), which moves the 13 line objects of every timeslice one after the other, so that the
 // new state appears from left to right; the first drawing of a run takes longer. The slow start of
 // demo 26 (SLOW) is a counting loop of SLOW*1000000/ic^2 steps (about 15000 steps per ms).
-// After the first drawing (slow motion), the demo runs twice as fast as in VFP (AFTER_FIRST).
+// The demo runs twice as fast as in VFP (AFTER_FIRST); only demos 5, 6 and 26 start with the first drawing in
+// slow motion, at the speed of VFP.
 // ---------------------------------------------------------------------------------------------
 const CYCLE_MS = { 1: 10, 2: 16, 6: 32 };
 const DRAW_MS = { 1: 960, 2: 1060, 6: 1080 };
 const FIRST_DRAW_MS = { 1: 6100, 2: 5900, 6: 6500 };
 const SLOW_STEPS_PER_MS = 15000;
 const AFTER_FIRST = 2;
+const SLOW_START = [5, 6, 26];
 
 // ---------------------------------------------------------------------------------------------
 // Painting the form (VFP objects in their z-order: labels first, then the line objects)
@@ -1323,7 +1323,7 @@ function paint(D, shown) {
   ctx.fillStyle = "#f0f0f0"; ctx.fillRect(p.left + 2, p.top + 2, p.width - 4, p.height - 4);
   ctx.save(); ctx.beginPath(); ctx.rect(p.left + 2, p.top + 2, p.width - 4, p.height - 4); ctx.clip();
   ctx.fillStyle = "#000"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-  wrapLines(p.caption, p.width - 10).forEach((s, k) => text(s, p.left + p.width / 2, p.top + 15 + k * 14, FONT_LBP));
+  wrapLines(p.caption.replace(/\r*Click to (interrupt|resume) \/ RightClick to stop$/, ""), p.width - 10).forEach((s, k) => text(s, p.left + p.width / 2, p.top + 15 + k * 14, FONT_LBP));
   ctx.restore();
   for (let k = 1; k <= 8; k++) label(O["LBS" + k], "#c0c0c0", FONT_LBS, 11, 9);
   // line objects: a vertical line covers the rows Top .. Top+Height-1
@@ -1340,9 +1340,6 @@ function paint(D, shown) {
   for (const n of ["LTCL3", "LTBL3", "LTNL3", "LTCL5"]) if (O[n].top >= 0) label(O[n], "#f0f0f0", FONT_LTL, 0, 8);
   for (let k = 1; k <= 8; k++) hline(O["LTA" + k]);
   hline(O.S5HALT);
-  // the clickable area over the EditBox
-  const e = document.getElementById("lbp");
-  Object.assign(e.style, { left: p.left + "px", top: p.top + "px", width: p.width + "px", height: p.height + "px" });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1377,11 +1374,13 @@ class App {
     const mode = D.MEM.MODE;
     for (let r = gen.next(); !r.done; r = gen.next()) {
       if (myRun !== this.run) return;
-      const f = this.draws > 0 ? AFTER_FIRST : 1;
+      const slowStart = SLOW_START.includes(this.demo) && this.draws === 0;
+      const f = slowStart ? 1 : AFTER_FIRST;
       due += (CYCLE_MS[mode] || 10) / this.speed / f;
       if (r.value.drawn) {
         if (!r.value.end && D.MEM.SLOW > 0 && D.pnIC >= 2) due += D.MEM.SLOW * 1e6 / (D.pnIC * D.pnIC) / SLOW_STEPS_PER_MS / this.speed / f;
-        await this.sweep(myRun, Math.max(0, due - performance.now()), this.draws++ === 0 ? FIRST_DRAW_MS[mode] || 6000 : (DRAW_MS[mode] || 960) / AFTER_FIRST);
+        this.draws++;
+        await this.sweep(myRun, Math.max(0, due - performance.now()), slowStart ? FIRST_DRAW_MS[mode] || 6000 : (DRAW_MS[mode] || 960) / AFTER_FIRST);
         if (myRun !== this.run) return;
         due = performance.now();
       }
@@ -1418,14 +1417,12 @@ class App {
     const D = this.D;
     if (!D || this.state !== "run") return;
     D.plPause = !D.plPause;
-    const c = D.obj.LBP.caption;
-    D.obj.LBP.caption = D.plPause ? c.replace("interrupt", "resume") : c.replace("resume", "interrupt");
     paint(D, this.shown);
     markRun();
   }
   stop() { if (this.D && this.state === "run") { this.D.plBreak = true; this.D.plPause = false; markRun(); } }
 }
-// the Interrupt / Resume and Stop buttons (as clicking and right-clicking the text box at the bottom left)
+// the Interrupt / Resume and Stop buttons
 function markRun() {
   const bi = document.getElementById("bint"), bs = document.getElementById("bstop");
   if (!bi) return;
@@ -1448,10 +1445,10 @@ function buildPanel() {
   add("div", "sub", "ELL article Part 1, Beunis 2022 – live demos");
   const ctl = add("div", "row"); ctl.id = "ctl";
   const bi = document.createElement("button"); bi.id = "bint"; bi.tabIndex = -1;
-  bi.title = "Interrupt the demo, and resume it\n(as clicking the text box at the bottom left)";
+  bi.title = "Interrupt the demo, and resume it";
   bi.addEventListener("click", () => app.pause());
   const bs = document.createElement("button"); bs.id = "bstop"; bs.tabIndex = -1; bs.textContent = "\u25A0  Stop";
-  bs.title = "Stop the run of 250 iterations: the end result is drawn\n(as right-clicking the text box at the bottom left)";
+  bs.title = "Stop the run of 250 iterations: the end result is drawn";
   bs.addEventListener("click", () => app.stop());
   ctl.appendChild(bi); ctl.appendChild(bs);
   for (const [sec, list] of SECTIONS) {
@@ -1532,9 +1529,6 @@ fit();
 select(demo);
 window.decorrelator = app;   // for inspection in the browser console
 
-const lbpEl = document.getElementById("lbp");
-lbpEl.addEventListener("click", e => { e.stopPropagation(); app.pause(); });
-lbpEl.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); app.stop(); });
 if (params.get("final") === "1") {   // test: compute the whole demo at once and show the end result
   app.state = "run";
   const g = app.D.EXECUTE(); for (let r = g.next(); !r.done; r = g.next()) { /* */ }
@@ -1586,7 +1580,7 @@ document.addEventListener("pointercancel", cancelLongPress, true);
 document.addEventListener("click", e => {   // a long press is not a click
   if (lpFired) { lpFired = false; e.stopPropagation(); e.preventDefault(); }
 }, true);
-document.addEventListener("contextmenu", e => { if (lastPointerType === "touch" && !e.target.closest("#lbp")) e.preventDefault(); });
+document.addEventListener("contextmenu", e => { if (lastPointerType === "touch") e.preventDefault(); });
 </script>
 </body>
 </html>

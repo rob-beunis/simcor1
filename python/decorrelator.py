@@ -28,9 +28,11 @@ Deliberate differences from VFP:
   * RAND() -> a Park-Miller generator.  Reproducing the exact random sequence
     of a VFP run is impossible; with --seed a run is reproducible.
   * The speed of an iteration and of a screen drawing is taken from VFP 9;
-    after the first drawing (slow motion) a demo runs twice as fast.  A demo
-    starts at once (VFP first waits for a key).  A playback speed control,
-    Interrupt/Stop buttons and a demo panel were added.
+    a demo runs twice as fast (only demos 5, 6 and 26 start with the first
+    drawing in slow motion, at the speed of VFP).  A demo starts at once (VFP
+    first waits for a key).  A playback speed control, Interrupt/Stop buttons
+    (instead of clicking / right-clicking the text box) and a demo panel were
+    added.
   * The parameter table MEM.DBF is not kept between sessions: every demo
     starts from the demo values.
   * Only the modes used in the article are translated: basic simulation
@@ -46,6 +48,7 @@ Usage:
 
 import argparse
 import math
+import re
 import sys
 import time
 from decimal import Decimal, ROUND_HALF_UP
@@ -1274,12 +1277,14 @@ SPEEDS = (0.25, 0.5, 1, 2, 4, 8, 16)
 # (DRAWALLLINES), which moves the 13 line objects of every timeslice one after the other, so that the new
 # state appears from left to right; the first drawing of a run takes longer. The slow start of demo 26
 # (SLOW) is a counting loop of SLOW*1000000/ic^2 steps (about 15000 steps per ms).
-# After the first drawing (slow motion), a demo runs twice as fast as in VFP (AFTER_FIRST).
+# A demo runs twice as fast as in VFP (AFTER_FIRST); only demos 5, 6 and 26 start with the first drawing in
+# slow motion, at the speed of VFP.
 CYCLE_MS = {1: 10, 2: 16, 6: 32}
 DRAW_MS = {1: 960, 2: 1060, 6: 1080}
 FIRST_DRAW_MS = {1: 6100, 2: 5900, 6: 6500}
 SLOW_STEPS_PER_MS = 15000
 AFTER_FIRST = 2
+SLOW_START = (5, 6, 26)
 FORM_W = 632
 
 
@@ -1333,7 +1338,8 @@ class Form:
         dr.rectangle((p.left + 1, p.top + 1, p.left + p.width - 2, p.top + p.height - 2), fill=(255, 255, 255))
         dr.rectangle((p.left + 2, p.top + 2, p.left + p.width - 3, p.top + p.height - 3), fill=(240, 240, 240))
         lines = []
-        for para in p.caption.split("\r"):
+        caption = re.sub(r"\r*Click to (interrupt|resume) / RightClick to stop$", "", p.caption)   # the buttons do it
+        for para in caption.split("\r"):
             line = ""
             for w in para.split(" ") if para else [""]:
                 t = w if line == "" else line + " " + w
@@ -1386,8 +1392,6 @@ class App:
         self.panel = tk.Frame(root, bg="#d4d0c8", padx=5, pady=4)
         self.panel.grid(row=0, column=1, sticky="ns")
         self.build_panel()
-        self.cv.bind("<Button-1>", self.on_click)
-        self.cv.bind("<Button-3>", self.on_right)
         self.select(demo)
 
     def build_panel(self):
@@ -1443,7 +1447,7 @@ class App:
         self.mark_run()
 
     def mark_run(self):
-        """The Interrupt / Resume and Stop buttons (as clicking and right-clicking the text box at the bottom left)."""
+        """The Interrupt / Resume and Stop buttons."""
         running = self.state in ("run", "wait")
         paused = bool(self.D and self.D.plPause)
         self.bint.configure(text="\u25b6  Resume" if paused else "\u275a\u275a  Interrupt",
@@ -1472,26 +1476,11 @@ class App:
         self.tkimg = ImageTk.PhotoImage(img)
         self.cv.configure(image=self.tkimg)
 
-    def in_lbp(self, e):
-        p = self.D.obj["LBP"]
-        x, y = e.x / self.scale, e.y / self.scale
-        return p.left <= x < p.left + p.width and p.top <= y < p.top + p.height
-
-    def on_click(self, e):
-        if self.in_lbp(e):
-            self.pause()
-
-    def on_right(self, e):
-        if self.in_lbp(e):
-            self.stop()
-
     def pause(self):
         if self.state != "run":
             return
         D = self.D
         D.plPause = not D.plPause
-        c = D.obj["LBP"].caption
-        D.obj["LBP"].caption = c.replace("interrupt", "resume") if D.plPause else c.replace("resume", "interrupt")
         self.show()
         self.mark_run()
 
@@ -1526,13 +1515,14 @@ class App:
                 self.state = "done"
                 self.mark_run()
                 return
-            f = AFTER_FIRST if self.draws > 0 else 1
+            slow_start = self.demo in SLOW_START and self.draws == 0
+            f = 1 if slow_start else AFTER_FIRST
             self.due += self.cyc / self.speed / f
             if r["drawn"]:
                 D, mode = self.D, self.D.MEM["MODE"]
                 if not r.get("end") and D.MEM["SLOW"] > 0 and D.pnIC >= 2:
                     self.due += D.MEM["SLOW"] * 1e6 / (D.pnIC * D.pnIC) / SLOW_STEPS_PER_MS / 1000 / self.speed / f
-                ms = FIRST_DRAW_MS.get(mode, 6000) if self.draws == 0 else DRAW_MS.get(mode, 960) / AFTER_FIRST
+                ms = FIRST_DRAW_MS.get(mode, 6000) if slow_start else DRAW_MS.get(mode, 960) / AFTER_FIRST
                 self.draws += 1
                 self.sweep_target, self.sweep_done = clone_lines(D.L), 0
                 self.sweep_ms, self.sweep_t0 = ms, max(self.due, time.perf_counter())

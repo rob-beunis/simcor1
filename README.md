@@ -20,11 +20,11 @@ It runs in any modern web browser, with nothing to install. Every demo of the ar
 
 The panel to the right of the demo lists all demos of the article (5–49), grouped by section of the article, with figure and page. Page numbers are those printed at the bottom of the pages of the article.
 
-A demo starts at once. The first iteration is drawn in slow motion, at the speed of the original program; after it, the demo runs twice as fast as the original. The buttons "Interrupt" (then "Resume") and "Stop" at the top of the panel interrupt and stop the run; as in the original program, clicking and right-clicking the text box at the bottom left do the same. Every run takes a different random course (the random signal S2).
+A demo starts at once and runs twice as fast as the original program; in demos 5, 6 and 26 the first iteration is drawn in slow motion, at the speed of the original. The buttons "Interrupt" (then "Resume") and "Stop" at the top of the panel interrupt and stop the run. Every run takes a different random course (the random signal S2).
 
 Optional additions to the address:
 
-- `&speed=0.5` plays back at half speed. Values from 0.25 to 16 are accepted. At 1x the first iteration runs at the speed of the original in Visual FoxPro 9, the rest twice as fast. The speed can also be changed with the buttons below the panel, also while a demo is running.
+- `&speed=0.5` plays back at half speed. Values from 0.25 to 16 are accepted. At 1x a demo runs twice as fast as the original in Visual FoxPro 9 (the slow-motion start of demos 5, 6 and 26 at its speed). The speed can also be changed with the buttons below the panel, also while a demo is running.
 - `&seed=123` gives a reproducible run.
 
 Every button has an explanation (tooltip). With a mouse, rest the pointer on the button; on a tablet or phone, press and hold the button for about half a second.
@@ -52,7 +52,8 @@ The figures and videos of the article were made with the DECORRELATOR form of th
 The Python and web versions follow the VFP code procedure by procedure, with the same procedure names (DEMO, MEM, STEP, MAKE_S1, MAKE_S2, SUBTRACT, ONECYCLE, DRAWALLLINES, LBPCAPTION, ...), rules and parameters, and the same screen layout as the screenshots in the article. Every value that VFP stores in a table field is rounded the way VFP does it, and the line objects are drawn at the same whole pixels. They were checked against runs of the original in Visual FoxPro 9: with the same random numbers, all demos give identical results (all table values after the first, second, tenth and last iteration, the number of random numbers used, the positions of all line objects, and all texts on the screen). They differ from the original in a few deliberate ways:
 
 - Random numbers: the random number generator differs from VFP's `RAND()`, so an individual VFP run cannot be reproduced exactly.
-- Speed: 1x is the speed measured in VFP 9 for the first iteration, and twice that speed after it. The original waits for a key before it starts ("Press any key to continue..."); the demos here start at once.
+- Speed: 1x is twice the speed measured in VFP 9 (the slow-motion first drawing of demos 5, 6 and 26 at that speed). The original waits for a key before it starts ("Press any key to continue..."); the demos here start at once.
+- Interrupting and stopping: in the original by clicking and right-clicking the text box at the bottom left ("Click to interrupt / RightClick to stop"); here with the buttons Interrupt and Stop, so that this line of the text box is left out.
 - Parameters: the parameter table `MEM.DBF` is not kept between sessions; every demo starts from its demo values.
 - Modes: the modes used in this article are translated: the basic simulation and the ELL simulation (MGC). The eye blink (EBR) modes of the form belong to other articles.
 - Additions: a demo panel, Interrupt/Stop buttons and a playback speed control. The dashboard of the original (the form with all settings) is used internally, because the text of a demo is built from it, but it is not shown.
