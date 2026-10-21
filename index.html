@@ -44,6 +44,9 @@
   #panel #bstop { width: 90px; background: #ff6b5b; color: #fff; }
   #panel #ctl button:disabled { background: #e1e1e1; color: #a0a0a0; border-color: #adadad; cursor: default; }
   #panel #bint.paused { background: #7ee07e; }
+  #panel #bgo { width: 100%; height: 32px; font-size: 13px; border: 2px solid #000; border-radius: 3px; margin-top: 4px; }
+  /* the start button is red on yellow as long as no demo is running */
+  #panel #bgo.blink { color: #ff0000; background: #ffff00; }
   #info { margin-top: 6px; padding: 4px 5px; background: #fff; border: 1px solid #808080; min-height: 74px;
           font-size: 10.5px; line-height: 1.3; white-space: pre-wrap; }
   #info b { font-size: 11px; }
@@ -1360,15 +1363,13 @@ class App {
     this.draws = 0;
     paint(this.D);
     markRun();
-    const myRun = this.run;
-    setTimeout(() => { if (myRun === this.run) this.go(); }, 400);   // the demo starts at once
+    // the demo starts with the button '(Re)Start this demo'
   }
   async go() {
     if (this.state !== "wait") return;
     this.state = "run";
     markRun();
     const myRun = this.run, D = this.D;
-    gcCount("run-" + this.demo, "Demo " + this.demo + " started");
     const gen = D.EXECUTE();
     let due = performance.now();
     const mode = D.MEM.MODE;
@@ -1426,7 +1427,9 @@ class App {
 function markRun() {
   const bi = document.getElementById("bint"), bs = document.getElementById("bstop");
   if (!bi) return;
-  const running = app.state === "run" || app.state === "wait", paused = !!(app.D && app.D.plPause);
+  const running = app.state === "run", paused = !!(app.D && app.D.plPause);
+  const bg = document.getElementById("bgo");
+  if (bg) bg.classList.toggle("blink", !running);
   bi.disabled = !running; bs.disabled = !running;
   bi.textContent = paused ? "\u25B6  Resume" : "\u275A\u275A  Interrupt";
   bi.classList.toggle("paused", paused);
@@ -1473,11 +1476,13 @@ function buildPanel() {
     b.addEventListener("click", () => { app.speed = sp; markPanel(); updateUrl(); });
     spd.appendChild(b);
   }
-  const rr = add("div", "row"); rr.style.marginTop = "5px";
-  const again = document.createElement("button"); again.className = "wide"; again.textContent = "Restart this demo"; again.tabIndex = -1;
-  again.title = "Run the demo again (with a new random signal S2).";
-  again.addEventListener("click", () => select(app.demo));
-  rr.appendChild(again);
+  const go = add("button", "", "(Re)Start this demo"); go.id = "bgo"; go.tabIndex = -1;
+  go.title = "Start the chosen demo, or run it again (with a new random signal S2).";
+  go.addEventListener("click", () => {
+    if (app.state !== "wait") select(app.demo);
+    gcCount("run-" + app.demo, "Demo " + app.demo + " started");
+    app.go();
+  });
 }
 function markPanel() {
   for (const b of panel.querySelectorAll("button[data-demo]")) b.classList.toggle("on", +b.dataset.demo === app.demo);

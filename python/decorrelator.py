@@ -29,10 +29,10 @@ Deliberate differences from VFP:
     of a VFP run is impossible; with --seed a run is reproducible.
   * The speed of an iteration and of a screen drawing is taken from VFP 9;
     a demo runs twice as fast (only demos 5, 6 and 26 start with the first
-    drawing in slow motion, at the speed of VFP).  A demo starts at once (VFP
-    first waits for a key).  A playback speed control, Interrupt/Stop buttons
-    (instead of clicking / right-clicking the text box) and a demo panel were
-    added.
+    drawing in slow motion, at the speed of VFP).  A demo starts with the
+    button '(Re)Start this demo' (VFP waits for a key).  A playback speed
+    control, Interrupt/Stop buttons (instead of clicking / right-clicking the
+    text box) and a demo panel were added.
   * The parameter table MEM.DBF is not kept between sessions: every demo
     starts from the demo values.
   * Only the modes used in the article are translated: basic simulation
@@ -1430,8 +1430,24 @@ class App:
                           command=lambda sp=sp: self.set_speed(sp))
             b.pack(side="left", padx=1)
             self.sbuttons[sp] = b
-        tk.Button(self.panel, text="Restart this demo", font=("Arial", 8, "bold"), bg="#e1e1e1",
-                  command=lambda: self.select(self.demo)).pack(anchor="w", pady=(5, 0))
+        self.bgo = tk.Button(self.panel, text="(Re)Start this demo", font=("Arial", 11, "bold"), bd=2, height=1,
+                             command=self.start)
+        self.bgo.pack(fill="x", pady=(6, 0))
+        self.mark_start()
+
+    def start(self):
+        """'(Re)Start this demo': starts the chosen demo, or runs it again."""
+        if self.state != "wait":
+            self.select(self.demo)
+        self.go()
+
+    def mark_start(self):
+        """The start button is red on yellow as long as no demo is running."""
+        if self.state == "run":
+            self.bgo.configure(bg="#e1e1e1", fg="#000000", activebackground="#e5f1fb", activeforeground="#000000")
+        else:
+            self.bgo.configure(bg="#ffff00", fg="#ff0000", activebackground="#ffff80", activeforeground="#ff0000")
+        self.root.after(250, self.mark_start)
 
     def set_speed(self, sp):
         self.speed = sp
@@ -1448,7 +1464,7 @@ class App:
 
     def mark_run(self):
         """The Interrupt / Resume and Stop buttons."""
-        running = self.state in ("run", "wait")
+        running = self.state == "run"
         paused = bool(self.D and self.D.plPause)
         self.bint.configure(text="\u25b6  Resume" if paused else "\u275a\u275a  Interrupt",
                             bg="#7ee07e" if paused else "#ffd24d", state="normal" if running else "disabled")
@@ -1464,9 +1480,7 @@ class App:
         self.shown = clone_lines(self.D.L)
         self.draws = 0
         self.mark()
-        self.show()
-        rid = self.run_id
-        self.root.after(400, lambda: self.go() if rid == self.run_id and self.state == "wait" else None)   # starts at once
+        self.show()                         # the demo starts with the button '(Re)Start this demo'
 
     def show(self):
         from PIL import Image, ImageTk

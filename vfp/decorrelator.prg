@@ -8,6 +8,7 @@
 *  - a run starts at once (no 'Press any key to continue');
 *  - in the interactive mode the dashboard is open at once, on the right half of the screen (BASEFORM has
 *    WindowState 0 instead of 2), and both forms are not modal, so that the dashboard stays open during a run;
+*    during a run, Reset also stops the run, and the Execute buttons and 'Load values of demo' do nothing;
 *  - the dashboard is laid out faster at the start.
 *
 * Usage:  DO decorrelator              interactive mode (dashboard)
@@ -84,12 +85,29 @@ PUBLIC oCerebreader
 oCerebreader=CREATEOBJECT("Empty")
 ADDPROPERTY(oCerebreader,"Width",1264)
 
+* The settings table MEM.DBF is created empty (all zeros) at the first start; in CEREBREADER it always existed.
+* An empty record would make a run loop endlessly (DLW, the step of the loops, is 0), so that at the first start
+* the values of demo 5 are loaded (as with 'Load values of demo 5'), in both value sets.
+LOCAL lFreshMem
+lFreshMem=NOT FILE("MEM.DBF")
 IF EMPTY(cDemo)
 	oDecorrelator=CREATEOBJECT('DECORRELATOR',.F.,'',.F.,'Decorrelator')
 ELSE
 	oDecorrelator=CREATEOBJECT('DECORRELATOR',.T.,cDemo,.F.,'demo-1-'+cDemo)
 ENDIF
 oDecorrelator.Show()
+IF lFreshMem AND EMPTY(cDemo)
+	LOCAL lcAlias
+	lcAlias=ALIAS()
+	oDecorrelator.DEMO(.T.,5)
+	SELECT MEM
+	GO 1
+	SCATTER MEMVAR
+	GO 2
+	GATHER MEMVAR
+	GO 1
+	SELECT (lcAlias)		&& the run procedures work in the current work area (SIMCOR1)
+ENDIF
 IF EMPTY(cDemo) AND TYPE("oDashBoard")="O" AND NOT ISNULL(oDashBoard)
 	oDashBoard.AlwaysOnTop=.T.	&& above the DECORRELATOR form, which is AlwaysOnTop
 	oDashBoard.Show()		&& the dashboard is open at once (in a demo it would cover the demo: "Show dashboard")
@@ -107,6 +125,15 @@ RELEASE ALL
 CLEAR ALL
 CLOSE ALL
 RETURN
+
+* .T. while a run is in progress (ALLCYCLES or ONECYCLE active): the dashboard stays open during a run
+FUNCTION RUNNING_NOW(nX)
+FOR nX=1 TO PROGRAM(-1)
+	IF "ALLCYCLES"$UPPER(PROGRAM(nX)) OR "ONECYCLE"$UPPER(PROGRAM(nX))
+		RETURN .T.
+	ENDIF
+ENDFOR
+RETURN .F.
 
 * Ends READ EVENTS when the DECORRELATOR form has been closed (and closes the dashboard)
 DEFINE CLASS WAITCLOSE AS TIMER
@@ -1731,7 +1758,7 @@ ENDIF
 	RETURN
 	
 	PROCEDURE CB6_6
-	thisform.RESET(.T.)
+	thisform.RESET(NOT RUNNING_NOW()) && GitHub version: during a run, Reset also stops the run
 	RETURN
 	
 	PROCEDURE RESET(lNoBreak,nX,cX,nY,cY)
@@ -4029,6 +4056,9 @@ DEFINE CLASS CBDB AS COMMANDBUTTON
 	
 	PROCEDURE Click(cN)
 	cN=this.Name
+	IF RUNNING_NOW() AND (INLIST(cN,"CB6_1","CB6_2","CB6_3","CB6_4","CB6_5") OR cN="CB5_3") && GitHub version:
+		RETURN && no new run (or other demo values) during a run
+	ENDIF
 	oDecorrelator.INFO((cN),0)
 &&		oDecorrelator.PNTOP
 &&		oDashBoard.DASHBOARDCOHERENCE && because new values in MEM require adjustments in the dashboard
