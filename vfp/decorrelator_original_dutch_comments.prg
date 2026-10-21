@@ -1,10 +1,14 @@
 * DECORRELATOR - stand-alone version of the DECORRELATOR form of CEREBREADER.PRG
 * Dr. R. BEUNIS - Visual FoxPro 9.0
 *
-* Added for the publication on GitHub (2026): this start-up part and the minimal class BASEFORM.
-* The classes DECORRELATOR, DASHBOARD and their helper classes are copied unchanged from the author's
-* article reader CEREBREADER.PRG (the version with which the figures and videos of the articles were made);
-* BASEFORM keeps only the methods these forms use (also unchanged).
+* Added for the publication on GitHub (2026): this start-up part, the timer WAITCLOSE and the minimal class
+* BASEFORM. The classes DECORRELATOR, DASHBOARD and their helper classes are copied from the author's article
+* reader CEREBREADER.PRG (the version with which the figures and videos of the article were made); BASEFORM
+* keeps only the methods these forms use. Changes for this version, marked '&& GitHub version:' :
+*  - a run starts at once (no 'Press any key to continue');
+*  - in the interactive mode the dashboard is open at once, on the right half of the screen (BASEFORM has
+*    WindowState 0 instead of 2), and both forms are not modal, so that the dashboard stays open during a run;
+*  - the dashboard is laid out faster at the start.
 *
 * Usage:  DO decorrelator              interactive mode (dashboard)
 *         DO decorrelator WITH "27"    demo 27 (video "demo-1-27" of the article)
@@ -85,7 +89,16 @@ IF EMPTY(cDemo)
 ELSE
 	oDecorrelator=CREATEOBJECT('DECORRELATOR',.T.,cDemo,.F.,'demo-1-'+cDemo)
 ENDIF
-oDecorrelator.Show(1)
+oDecorrelator.Show()
+IF EMPTY(cDemo) AND TYPE("oDashBoard")="O" AND NOT ISNULL(oDashBoard)
+	oDashBoard.AlwaysOnTop=.T.	&& above the DECORRELATOR form, which is AlwaysOnTop
+	oDashBoard.Show()		&& the dashboard is open at once (in a demo it would cover the demo: "Show dashboard")
+ENDIF
+* both forms are not modal: wait until the DECORRELATOR form is closed
+PUBLIC oWaitClose
+oWaitClose=CREATEOBJECT("WAITCLOSE")
+READ EVENTS
+oWaitClose=.NULL.
 
 SET STRICTDATE TO &pcSTRICTDATE
 SET SAFETY &pcSAFETY
@@ -95,11 +108,27 @@ CLEAR ALL
 CLOSE ALL
 RETURN
 
+* Ends READ EVENTS when the DECORRELATOR form has been closed (and closes the dashboard)
+DEFINE CLASS WAITCLOSE AS TIMER
+	Interval = 300
+
+	PROCEDURE Timer
+	IF TYPE("oDecorrelator")#"O" OR ISNULL(oDecorrelator)
+		this.Enabled=.F.
+		IF TYPE("oDashBoard")="O" AND NOT ISNULL(oDashBoard)
+			oDashBoard.Release
+		ENDIF
+		CLEAR EVENTS
+	ENDIF
+	RETURN
+
+ENDDEFINE
+
 * ------------------------------------------------------------------------------------------------------
 * BASEFORM of CEREBREADER.PRG: only the properties and the methods used by the forms below
 * ------------------------------------------------------------------------------------------------------
 DEFINE CLASS BASEFORM AS FORM
-	WindowState				= 2
+	WindowState				= 0		&& 2 in CEREBREADER.PRG; 0 so that the dashboard appears on the right half of the screen
 	ShowTips				= .T.
 	FontSize				= 8
 	KeyPreview				= .T.
@@ -199,7 +228,7 @@ RETURN ALLTRIM(lcPath)
 ENDDEFINE
 
 * ------------------------------------------------------------------------------------------------------
-* The forms DECORRELATOR and DASHBOARD of CEREBREADER.PRG (unchanged)
+* The forms DECORRELATOR and DASHBOARD of CEREBREADER.PRG (changes marked with && GitHub version:)
 * ------------------------------------------------------------------------------------------------------
 
 DEFINE CLASS DECORRELATOR AS BASEFORM
@@ -536,7 +565,8 @@ STORE .F. TO plBox,plBreak,plCon,plPause,plQuit
 	RETURN
 	
 	PROCEDURE CBDB.Click
-	oDashBoard.Show(1)
+	oDashBoard.AlwaysOnTop=.T. && GitHub version: above the DECORRELATOR form (which is AlwaysOnTop),
+	oDashBoard.Show() && GitHub version: and not modal (in CEREBREADER.PRG: Show(1))
 	RETURN
 	
 	PROCEDURE SPECSCALLED(lV)
@@ -1785,7 +1815,7 @@ ENDIF
 	FOR nX=pnIC+1 TO pnCycles STEP MEM.DLW
 		IF nX=1 &&INLIST(pcCMD,"26")
 &&			IF INT((nX-1)/10)=(nX-1)/10
-				WAIT ''
+&&				WAIT '' && GitHub version: a run starts at once
 &&			ENDIF
 		ENDIF
 		plFlag=.F.
@@ -3408,7 +3438,7 @@ DEFINE CLASS DASHBOARD AS BASEFORM
 			thisform.&cO._&cX..Top=thisform.LB9.Height+(nX-1)*nH
 			thisform.&cO._&cX..Height=nH*nF
 			IF cO="SP"
-				thisform.&cO._&cX..MouseUp
+				thisform.&cO._&cX..DISPLAYONCB && GitHub version: instead of .MouseUp (= DISPLAYONCB + DASHBOARDCOHERENCE), faster start
 			ENDIF
 		ENDIF
 	ENDFOR
@@ -4019,7 +4049,7 @@ DEFINE CLASS CBDB AS COMMANDBUTTON
 			oDecorrelator.Release
 		OTHERWISE
 			IF cN>"CB6_3"
-				thisform.Hide
+&&				thisform.Hide && GitHub version: the dashboard stays open
 			ENDIF
 			oDecorrelator.MEM((pcFields)) && Tussen haakjes want anders verdwijnt de variable pcFields !!
 			oDecorrelator.&cN

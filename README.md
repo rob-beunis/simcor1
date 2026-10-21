@@ -43,11 +43,12 @@ The page counts anonymous visits and demo starts with GoatCounter (no cookies, n
 
 - `vfp/decorrelator.prg`
   The original Visual FoxPro 9.0 program, with its comments translated into English. Start it with `DO decorrelator` (interactive mode, with the dashboard) or `DO decorrelator WITH "27"` (demo 27).
+  The VFP program uses fixed pixel positions, as in the article; it looks as in the figures of the article on a work area of about 1280 × 720 (for instance a 1920 × 1080 screen at 150 % scaling). On other screens the web version is the easier choice.
 
 - `vfp/decorrelator_original_dutch_comments.prg`
   The same program with its original Dutch comments.
 
-The figures and videos of the article were made with the DECORRELATOR form of the author's article reader, a larger Visual FoxPro program (`CEREBREADER.PRG`). The forms DECORRELATOR and DASHBOARD and their helper classes are copied unchanged into `decorrelator.prg`; only a short start-up part and a minimal base class (with the methods of the article reader these forms use, also unchanged) were added, so that it runs on its own.
+The figures and videos of the article were made with the DECORRELATOR form of the author's article reader, a larger Visual FoxPro program (`CEREBREADER.PRG`). The forms DECORRELATOR and DASHBOARD and their helper classes are copied into `decorrelator.prg`, with a short start-up part and a minimal base class (with the methods of the article reader these forms use), so that it runs on its own. A few changes for this version are marked with `&& GitHub version:` in the code: a run starts at once (no "Press any key to continue"), and in the interactive mode the dashboard is open at once and stays open during a run (both forms are not modal), and it is laid out faster at the start. The computing itself is unchanged.
 
 The Python and web versions follow the VFP code procedure by procedure, with the same procedure names (DEMO, MEM, STEP, MAKE_S1, MAKE_S2, SUBTRACT, ONECYCLE, DRAWALLLINES, LBPCAPTION, ...), rules and parameters, and the same screen layout as the screenshots in the article. Every value that VFP stores in a table field is rounded the way VFP does it, and the line objects are drawn at the same whole pixels. They were checked against runs of the original in Visual FoxPro 9: with the same random numbers, all demos give identical results (all table values after the first, second, tenth and last iteration, the number of random numbers used, the positions of all line objects, and all texts on the screen). They differ from the original in a few deliberate ways:
 
